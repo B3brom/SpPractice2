@@ -5,18 +5,32 @@ import (
 	"sync"
 	"time"
 )
-func print(num<-chan int){ //BETA
-	for req:=range filtered
-}
-func Semaftor(requests int, filtered chan<- int){
-	for req := range requests{
-		<-tick
-		filtered<-req
-	}
-	close(filtered)
+
+var jobs = make(chan int,15)
+var result = make(chan int,15)
+var wg sync.WaitGroup
+
+func Semaftor(){
+	tick:= time.Tick(200*time.Millisecond)
+	wg.Add(1)
+	go func(){
+		defer wg.Done()
+		for i := range jobs{
+			<-tick
+			result <-i
+			fmt.Printf("Задача № %d\n", i)
+		}
+	}()
 }
 func main() {
-	requests := make(chan int,15)
-	ch2 := make(chan int,15)
-	tick:= time.Tick(200*time.Millisecond)
-}
+
+	Semaftor()
+
+	for i:=1;i<=15;i++{
+		jobs<-i
+	}
+	close(jobs)
+	wg.Wait()
+	close(result)
+
+	}

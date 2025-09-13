@@ -1,39 +1,59 @@
 package main
-import(
+
+import (
 	"fmt"
-	"sync"
 	"net/http"
+	"sync"
 )
 
+const PoolSize = 3
 
-func Worker(wg1 *sync.WaitGroup,jobs <-chan string, result chan<- string){
-	defer wg1.Done()
-	for arg := range jobs {
-		Http,_ := http.Get(arg)
-		result <- arg
+type Task string
+
+type Result struct {
+	URL        string
+	StatusCode int
+	Err        error
+}
+
+func worker(id int, jobs <-chan Task, results chan<- Result, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for job := range jobs {
+		resp, err := http.Get(string(job))
+		if err != nil {
+			results <- Result{URL: string(job), StatusCode: 0, Err: fmt.Errorf("ошибка: %w", err)}
+			continue
+		}
+		results <- Result{URL: string(job), StatusCode: resp.StatusCode}
 	}
 }
 
 func main() {
-	jobs := make(chan string,10)
-	result := make(chan string,10)
+	urlsToScan := []string{
+		"https://google.com",
+		"https://yandex.ru",
+		"https://nyarchlinux.moe",
+		"https://discord.ru/",
+		"https://несуществующийсайт.рф",
+	}
+	jobs := make(chan Task, len(urlsToScan))
+	results := make(chan Result, len(urlsToScan))
 	var wg sync.WaitGroup
-	wg.Add(3)
-	go Worker(&wg, jobs,result)
-	go Worker(&wg,jobs,result)
-	go Worker(&wg,jobs,result)
-
-	List []string
-	for i := range List{
-		jobs <- j
+	for i := 0; i < PoolSize; i++ {
+		wg.Add(1)
+		go worker(i+1, jobs, results, &wg)
+	}
+	for _, url := range urlsToScan {
+		jobs <- Task(url)
 	}
 	close(jobs)
 	wg.Wait()
-	close(result)
-
-	for i := range result{
-		fmt.Printf("%v\n",i)
+	close(results)
+	for res := range results {
+		if res.Err != nil {
+			fmt.Printf("URL: %s, Ошибка: %v\n", res.URL, res.Err)
+		} else {
+			fmt.Printf("URL: %s, Статус: %d\n", res.URL, res.StatusCode)
+		}
 	}
-
-
 }
